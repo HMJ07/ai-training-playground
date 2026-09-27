@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Training Playground</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header>
+    <h1>AI Training Playground</h1>
+    <p class="subtitle">Entrena una IA para la tarea que elijas y observa el resultado en vivo.</p>
+  </header>
+
+  <main>
+    <section class="panel controls">
+      <label for="task-select">Tarea</label>
+      <select id="task-select"></select>
+      <div class="buttons">
+        <button id="start-btn">Iniciar entrenamiento</button>
+        <button id="stop-btn" disabled>Detener</button>
+      </div>
+
+      <div class="metrics">
+        <div><span>Paso</span><strong id="m-step">0</strong></div>
+        <div><span>Episodio</span><strong id="m-episode">0</strong></div>
+        <div><span>Ultima recompensa</span><strong id="m-last">0</strong></div>
+        <div><span>Media (100 ep.)</span><strong id="m-mean">0</strong></div>
+      </div>
+
+      <canvas id="reward-chart" width="320" height="140"></canvas>
+    </section>
+
+    <section class="panel viewer">
+      <div id="scene-container"></div>
+    </section>
+  </main>
+
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+  <script type="module" src="js/scene.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

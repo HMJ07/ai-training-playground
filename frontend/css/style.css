@@ -1,0 +1,115 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+}
+
+header {
+  padding: 1.5rem 2rem 0.5rem;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.subtitle {
+  color: #8b949e;
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+}
+
+main {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1rem;
+  padding: 1rem 2rem 2rem;
+  height: calc(100vh - 90px);
+}
+
+.panel {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.controls label {
+  display: block;
+  font-size: 0.8rem;
+  color: #8b949e;
+  margin-bottom: 0.3rem;
+}
+
+.controls select {
+  width: 100%;
+  padding: 0.5rem;
+  background: #0d1117;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+
+.buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+button {
+  flex: 1;
+  padding: 0.6rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#start-btn { background: #238636; color: white; }
+#stop-btn { background: #da3633; color: white; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.metrics div {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.metrics span {
+  display: block;
+  font-size: 0.7rem;
+  color: #8b949e;
+}
+
+.metrics strong {
+  font-size: 1.1rem;
+}
+
+#reward-chart {
+  width: 100%;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+
+.viewer {
+  padding: 0;
+  overflow: hidden;
+}
+
+#scene-container, #scene-container canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

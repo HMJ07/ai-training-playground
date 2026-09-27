@@ -180,6 +180,33 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   color: #8b949e;
 }
 
+.legend {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  background: #0d1117cc;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.legend-swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .viewer-hint:empty {
   display: none;
 }

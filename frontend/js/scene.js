@@ -167,11 +167,73 @@ function plainFloorTexture(fieldW, fieldH) {
   return tex;
 }
 
+function dataFloorTexture(fieldW, fieldH) {
+  const res = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = res;
+  canvas.height = Math.round((res * fieldH) / fieldW);
+  const ctx = canvas.getContext("2d");
+
+  const grad = ctx.createRadialGradient(
+    canvas.width / 2,
+    canvas.height / 2,
+    0,
+    canvas.width / 2,
+    canvas.height / 2,
+    Math.max(canvas.width, canvas.height) / 1.4
+  );
+  grad.addColorStop(0, "#111a2b");
+  grad.addColorStop(1, "#05070c");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "rgba(90,160,255,0.18)";
+  ctx.lineWidth = 1;
+  const step = Math.max(14, res / (fieldW * 1.6));
+  for (let x = 0; x <= canvas.width; x += step) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= canvas.height; y += step) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function glowSpriteTexture() {
+  const res = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = res;
+  canvas.height = res;
+  const ctx = canvas.getContext("2d");
+  const grad = ctx.createRadialGradient(res / 2, res / 2, 0, res / 2, res / 2, res / 2);
+  grad.addColorStop(0, "rgba(255,255,255,0.9)");
+  grad.addColorStop(0.4, "rgba(255,255,255,0.35)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, res, res);
+  return new THREE.CanvasTexture(canvas);
+}
+const GLOW_SPRITE_TEXTURE = glowSpriteTexture();
+
 // ---------------------------------------------------------------------------
 // Field + stadium backdrop
 // ---------------------------------------------------------------------------
 
-const GROUND_TEXTURE_BY_THEME = { pitch: pitchTexture, room: roomFloorTexture, plain: plainFloorTexture };
+const GROUND_TEXTURE_BY_THEME = {
+  pitch: pitchTexture,
+  room: roomFloorTexture,
+  plain: plainFloorTexture,
+  data: dataFloorTexture,
+};
 
 function buildField(fieldSpec) {
   currentFieldSpec = fieldSpec;
@@ -184,11 +246,16 @@ function buildField(fieldSpec) {
   if (stadium) scene.remove(stadium);
 
   const textureFn = GROUND_TEXTURE_BY_THEME[theme] ?? plainFloorTexture;
-  const group = new THREE.Group();
+  const roughnessByTheme = { pitch: 0.9, room: 0.6, plain: 0.6, data: 0.25 };
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(fieldSpec.w, fieldSpec.h),
-    new THREE.MeshStandardMaterial({ map: textureFn(fieldSpec.w, fieldSpec.h), roughness: theme === "pitch" ? 0.9 : 0.6 })
+    new THREE.MeshStandardMaterial({
+      map: textureFn(fieldSpec.w, fieldSpec.h),
+      roughness: roughnessByTheme[theme] ?? 0.6,
+      metalness: theme === "data" ? 0.3 : 0,
+    })
   );
+  const group = new THREE.Group();
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(fieldSpec.w / 2, 0, fieldSpec.h / 2);
   ground.receiveShadow = true;
@@ -419,6 +486,43 @@ function buildMarker(entity) {
   return group;
 }
 
+// A classification example: a small glowing orb (a data point in embedding
+// space, not a physical object) plus a soft billboard halo and a thin beam
+// down to the floor so it reads as "floating above the grid" rather than a
+// bare sphere sitting in a void.
+function buildDatapoint(entity) {
+  const radius = entity.radius ?? 0.35;
+  const color = entity.color ?? "#4f8cff";
+  const group = new THREE.Group();
+
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 16, 16),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.3 })
+  );
+  group.add(core);
+
+  const glow = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: GLOW_SPRITE_TEXTURE,
+      color,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  glow.scale.set(radius * 6, radius * 6, 1);
+  group.add(glow);
+
+  const beamMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25 });
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 6), beamMat);
+  group.add(beam);
+  group.userData.beam = beam;
+
+  group.userData.halfHeight = 0;
+  return group;
+}
+
 function buildPlain(entity) {
   let geometry;
   let halfHeight = entity.radius ?? 0.5;
@@ -446,6 +550,7 @@ function buildEntity(entity) {
   if (visual === "ball") return buildBall(entity.radius ?? 0.35);
   if (visual === "goal") return buildGoal(entity.size ?? [4, 2]);
   if (visual === "marker") return buildMarker(entity);
+  if (visual === "datapoint") return buildDatapoint(entity);
   return buildPlain(entity);
 }
 
@@ -489,6 +594,15 @@ function upsertEntity(entity, dt) {
   } else if (visual === "goal") {
     mesh.position.set(x, y, z);
     mesh.rotation.y = goalFacingRotationY(entity, currentFieldSpec);
+  } else if (visual === "datapoint") {
+    mesh.position.set(x, y, z);
+    const beam = mesh.userData.beam;
+    if (beam && y > 0.05) {
+      beam.scale.y = y;
+      beam.position.y = -y / 2;
+    } else if (beam) {
+      beam.visible = false;
+    }
   } else {
     const halfHeight = mesh.userData.halfHeight ?? entity.radius ?? 0.5;
     mesh.position.set(x, halfHeight + y, z);

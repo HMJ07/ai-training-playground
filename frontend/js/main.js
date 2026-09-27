@@ -10,6 +10,7 @@ const taskDescriptionEl = document.getElementById("task-description");
 const startBtn = document.getElementById("start-btn");
 const stopBtn = document.getElementById("stop-btn");
 const viewerHint = document.getElementById("viewer-hint");
+const legendEl = document.getElementById("legend");
 
 const classificationPanel = document.getElementById("classification-panel");
 const exampleText = document.getElementById("example-text");
@@ -89,7 +90,22 @@ function setupForKind(task) {
     viewerHint.textContent = "";
     classificationPanel.classList.add("hidden");
     setMetricLabels(["Paso", "Episodio", "Última recompensa", "Media (100 ep.)"]);
+    legendEl.classList.add("hidden");
   }
+}
+
+function updateLegend(legend) {
+  if (!legend || legend.length === 0) {
+    legendEl.classList.add("hidden");
+    return;
+  }
+  legendEl.innerHTML = legend
+    .map(
+      (item) =>
+        `<div class="legend-item"><span class="legend-swatch" style="background:${item.color}"></span>${item.label}</div>`
+    )
+    .join("");
+  legendEl.classList.remove("hidden");
 }
 
 function setMetricLabels(labels) {
@@ -107,6 +123,7 @@ function connectSocket() {
     if (msg.type === "tick") {
       renderTick(msg.render);
       updateMetrics(msg.metrics);
+      if (msg.render.legend) updateLegend(msg.render.legend);
     }
   };
   socket.onclose = () => {

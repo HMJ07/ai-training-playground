@@ -100,12 +100,18 @@ class TextClassifierTask:
                 {
                     "id": f"ex_{i}",
                     "kind": "circle",
+                    "visual": "datapoint",
                     "radius": 0.35,
                     "color": self._label_color.get(labels[i], "#888888"),
-                    "position": [x, 0, z],
+                    "label": str(labels[i]),
+                    "position": [x, 0.6, z],
                 }
             )
-        return {"field": {"w": FIELD_SIZE, "h": FIELD_SIZE}, "entities": entities}
+        return {
+            "field": {"w": FIELD_SIZE, "h": FIELD_SIZE, "theme": "data"},
+            "entities": entities,
+            "legend": [{"label": lab, "color": self._label_color[lab]} for lab in self.labels],
+        }
 
     def predict(self, text: str) -> dict[str, Any]:
         if not self._fitted:

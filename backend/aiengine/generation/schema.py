@@ -86,10 +86,34 @@ TASK_SPEC_TOOL = {
                         "from": {"type": "string", "description": "Entity id (distance_delta, reach_bonus)."},
                         "to": {"type": "string", "description": "Entity id (distance_delta, reach_bonus)."},
                         "entity": {"type": "string", "description": "Entity id (velocity_penalty, out_of_bounds_penalty)."},
-                        "weight": {"type": "number"},
+                        "weight": {
+                            "type": "number",
+                            "minimum": 0,
+                            "description": (
+                                "ALWAYS a positive number, never negative. For distance_delta: reward "
+                                "given each step equals (previous_distance - current_distance) * weight, "
+                                "so a positive weight rewards getting closer. For time_penalty and "
+                                "velocity_penalty this positive amount is SUBTRACTED each step, so a "
+                                "positive weight discourages wasting time / moving fast."
+                            ),
+                        },
                         "threshold": {"type": "number", "description": "Distance to count as 'reached' (reach_bonus)."},
-                        "bonus": {"type": "number"},
-                        "penalty": {"type": "number"},
+                        "bonus": {
+                            "type": "number",
+                            "description": (
+                                "Added to the reward when reach_bonus triggers. Positive to reward "
+                                "reaching a target (e.g. a goal); negative to punish reaching something "
+                                "bad (e.g. an obstacle or a wrong-colored zone)."
+                            ),
+                        },
+                        "penalty": {
+                            "type": "number",
+                            "minimum": 0,
+                            "description": (
+                                "ALWAYS a positive number. This amount is SUBTRACTED from the reward "
+                                "when out_of_bounds_penalty triggers."
+                            ),
+                        },
                         "ends_episode": {"type": "boolean"},
                     },
                 },

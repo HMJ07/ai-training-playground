@@ -40,7 +40,7 @@ CONTROL_TASK_TOOL = {
             "entities": {
                 "type": "array",
                 "minItems": 1,
-                "maxItems": 8,
+                "maxItems": 12,
                 "items": {
                     "type": "object",
                     "required": ["id", "kind", "color"],
@@ -78,7 +78,7 @@ CONTROL_TASK_TOOL = {
                             "description": "[width, height] for kind=box.",
                         },
                         "color": {"type": "string", "description": "CSS hex color, e.g. '#4f8cff'."},
-                        "mass": {"type": "number", "minimum": 0.1, "maximum": 50},
+                        "mass": {"type": "number", "minimum": 0.1, "maximum": 200},
                         "static": {
                             "type": "boolean",
                             "description": "True for immovable markers/obstacles/goals.",
@@ -99,13 +99,13 @@ CONTROL_TASK_TOOL = {
                 "required": ["controlled_entity"],
                 "properties": {
                     "controlled_entity": {"type": "string", "description": "id of the entity the agent pushes around."},
-                    "max_force": {"type": "number", "minimum": 1, "maximum": 30},
+                    "max_force": {"type": "number", "minimum": 1, "maximum": 100},
                 },
             },
             "reward_terms": {
                 "type": "array",
                 "minItems": 1,
-                "maxItems": 6,
+                "maxItems": 12,
                 "items": {
                     "type": "object",
                     "required": ["type"],

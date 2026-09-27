@@ -29,20 +29,42 @@ class TaskGenerationError(RuntimeError):
     pass
 
 
+def _looks_like_schema_error(message: str) -> bool:
+    """Heuristic for 'the model's own output violated the tool schema' errors.
+
+    Worth one automatic retry with a corrective nudge, unlike a rate limit
+    or network error which would just fail the same way again immediately.
+    """
+    m = message.lower()
+    return "tool_use_failed" in m or "did not match schema" in m or "invalid_request_error" in m
+
+
 def generate_task_spec(description: str) -> dict:
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
     groq_key = os.environ.get("GROQ_API_KEY")
-
-    if anthropic_key:
-        tool_name, spec = _generate_with_anthropic(description, anthropic_key)
-    elif groq_key:
-        tool_name, spec = _generate_with_groq(description, groq_key)
-    else:
+    if not anthropic_key and not groq_key:
         raise TaskGenerationError(
             "Falta una clave de API. Copia .env.example a .env y pon "
             "ANTHROPIC_API_KEY o GROQ_API_KEY (ambas tienen capa gratuita) "
             "antes de generar una tarea."
         )
+
+    extra_note = None
+    for attempt in range(2):
+        try:
+            if anthropic_key:
+                tool_name, spec = _generate_with_anthropic(description, anthropic_key, extra_note)
+            else:
+                tool_name, spec = _generate_with_groq(description, groq_key, extra_note)
+            break
+        except TaskGenerationError as exc:
+            if attempt == 0 and _looks_like_schema_error(str(exc)):
+                extra_note = (
+                    f"Your previous attempt was rejected: {exc}. Re-generate the task, this time "
+                    "strictly respecting every minimum/maximum/maxItems limit in the tool's schema."
+                )
+                continue
+            raise
 
     if tool_name == CONTROL_TASK_TOOL["name"]:
         spec["kind"] = "control"
@@ -54,8 +76,11 @@ def generate_task_spec(description: str) -> dict:
     return spec
 
 
-def _generate_with_anthropic(description: str, api_key: str) -> tuple[str, dict]:
+def _generate_with_anthropic(description: str, api_key: str, extra_note: str | None = None) -> tuple[str, dict]:
     import anthropic
+
+    user_content = description if not extra_note else f"{description}\n\n{extra_note}"
+    messages = [{"role": "user", "content": user_content}]
 
     client = anthropic.Anthropic(api_key=api_key)
     try:
@@ -65,7 +90,7 @@ def _generate_with_anthropic(description: str, api_key: str) -> tuple[str, dict]
             system=SYSTEM_PROMPT,
             tools=TOOLS,
             tool_choice={"type": "any"},
-            messages=[{"role": "user", "content": description}],
+            messages=messages,
         )
     except anthropic.APIError as exc:
         raise TaskGenerationError(f"Error llamando a la API de Claude: {exc}") from exc
@@ -77,7 +102,7 @@ def _generate_with_anthropic(description: str, api_key: str) -> tuple[str, dict]
     raise TaskGenerationError("El modelo no devolvio una definicion de tarea valida.")
 
 
-def _generate_with_groq(description: str, api_key: str) -> tuple[str, dict]:
+def _generate_with_groq(description: str, api_key: str, extra_note: str | None = None) -> tuple[str, dict]:
     tools = [
         {
             "type": "function",
@@ -85,11 +110,12 @@ def _generate_with_groq(description: str, api_key: str) -> tuple[str, dict]:
         }
         for t in TOOLS
     ]
+    user_content = description if not extra_note else f"{description}\n\n{extra_note}"
     payload = {
         "model": GROQ_MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": description},
+            {"role": "user", "content": user_content},
         ],
         "tools": tools,
         "tool_choice": "required",

@@ -196,6 +196,13 @@ exactamente `.env` (no `.env.txt`). Revisa el paso 3.
 Cierra cualquier otro proceso que lo esté usando, o cambia `PORT` en
 `run.py`.
 
+**`http://localhost:8000` da "Not Found", pero `http://127.0.0.1:8000` sí funciona**
+Si tienes WSL o Docker Desktop instalados, es habitual que también tengan
+algo escuchando en el puerto 8000 en la dirección IPv6 (`::1`), y
+`localhost` a veces resuelve ahí antes que a IPv4. La app siempre escucha
+en `127.0.0.1` (IPv4) - usa esa URL directamente, o deja que `run.py`
+abra la pestaña por ti (ya usa la URL correcta automáticamente).
+
 **La instalación tarda mucho / se cuelga**
 PyTorch pesa varios cientos de MB; en una conexión lenta puede tardar
 varios minutos. Es normal.

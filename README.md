@@ -1,24 +1,37 @@
 # 🎮 AI Training Playground
 
-**Escribe la tarea que quieres que una IA aprenda a hacer, en tu propio idioma. La plataforma la construye, la entrena por refuerzo, y ves el resultado en 3D en vivo, en tu navegador.**
+**Escribe la tarea que quieres que una IA aprenda a hacer, en tu propio idioma. La plataforma la construye, la entrena, y ves el resultado en 3D en vivo, en tu navegador.**
 
-100% open-source. Corre en tu propio ordenador, con tus propios datos.
-No hay ningún menú de tareas predefinidas: tú decides qué se entrena.
+100% open-source y **100% gratis** (sin ninguna API de pago). Corre en tu
+propio ordenador, con tus propios datos. No hay ningún menú de tareas
+predefinidas: tú decides qué se entrena, y la plataforma detecta sola qué
+tipo de tarea es.
 
 ```
-Tú escribes:  "Un agente que empuje un balón hasta una portería,
-               evitando un obstáculo por el medio"
-                        │
-                        ▼
-        La IA construye la tarea automáticamente
-                        │
-                        ▼
-   Se entrena un agente de refuerzo (PPO) y lo ves aprender
-        en vivo, en 3D, en tu propio navegador
+Tú escribes:  "Un agente que empuje un balón hasta una portería"     "Que aprenda a distinguir llamadas de spam"
+                        │                                                          │
+                        ▼                                                          ▼
+              Tarea de CONTROL FÍSICO                                 Tarea de CLASIFICACIÓN DE TEXTO
+              (se entrena con RL / PPO)                                (se entrena con TF-IDF + SGD)
+                        │                                                          │
+                        └───────────────────────┬──────────────────────────────────┘
+                                                  ▼
+                       Lo ves aprender en vivo, en 3D, en tu propio navegador
 ```
 
-No necesitas saber nada de aprendizaje por refuerzo, física, ni redes
-neuronales para usarlo. Si sabes escribir una frase, sabes usar esto.
+No necesitas saber nada de aprendizaje por refuerzo, machine learning ni
+redes neuronales para usarlo. Si sabes escribir una frase, sabes usar esto.
+
+**Dos familias de tareas, un mismo motor gráfico:**
+
+- 🎯 **Control físico** — cualquier cosa sobre mover, empujar, alcanzar,
+  perseguir o esquivar algo en un espacio 2D. Se entrena con un motor PPO
+  (aprendizaje por refuerzo) propio.
+- 🏷️ **Clasificación de texto** — cualquier cosa sobre decidir a qué
+  categoría pertenece un texto: spam/no-spam, positivo/negativo, urgente/no
+  urgente, tema, intención... Se entrena con un clasificador TF-IDF + SGD
+  local (scikit-learn). Puedes añadir tus propios ejemplos reales y probar
+  el modelo entrenado con texto nuevo, en vivo.
 
 ---
 
@@ -83,23 +96,32 @@ métricas (recompensa por episodio, media móvil).
 
 ## 💡 Ejemplos de tareas que puedes escribir
 
+**Control físico:**
 - "Un agente que aprenda a esquivar obstáculos mientras cruza el campo"
 - "Un jugador que empuje una pelota roja hacia una zona verde, evitando la zona azul"
 - "Un agente que persiga un objetivo que se mueve"
 - "Algo que aprenda a mantener el equilibrio en el centro del campo"
 
-La IA traduce cualquier descripción razonable a una tarea física 2D
-(entidades, física, recompensa). Cuanto más concreta seas sobre qué debe
-tocar, evitar o alcanzar el agente, mejor sale la tarea generada.
+**Clasificación de texto:**
+- "Que aprenda a distinguir llamadas de spam de las que no lo son"
+- "Un clasificador de reseñas positivas y negativas"
+- "Detectar si un email es urgente o puede esperar"
+- "Clasificar mensajes de soporte por tema: facturación, técnico o cuenta"
+
+La IA decide sola qué familia de tarea encaja con lo que describes.
+Cuanto más concreta seas sobre qué debe tocar/evitar/alcanzar (control) o
+qué categorías existen y cómo distinguirlas (clasificación), mejor sale
+la tarea generada.
 
 ---
 
 ## 🧠 Cómo funciona por dentro
 
 Nada de "caja negra": cuando escribes una tarea, un modelo de lenguaje
-(Groq o Claude, a tu elección) no genera código - genera **datos**, un
-`TaskSpec` en JSON con un esquema fijo:
+(Groq o Claude, a tu elección - ambos con capa gratuita) no genera código,
+genera **datos**. Tiene dos "moldes" disponibles y elige el que encaja:
 
+**Si es control físico** → devuelve un `TaskSpec` con:
 - **`entities`**: círculos o cajas en un plano 2D (posición, color, masa,
   si son estáticas como un objetivo o un obstáculo).
 - **`action`**: qué entidad controla el agente, empujándola con una fuerza
@@ -108,39 +130,54 @@ Nada de "caja negra": cuando escribes una tarea, un modelo de lenguaje
   alcanzar un objetivo, penalizar salirse del campo, penalizar tiempo o
   velocidad).
 
-Ese JSON lo interpreta siempre el mismo código auditado
-(`ParametricEnv`, con física real vía [pymunk](https://www.pymunk.org/)) -
-la IA nunca ejecuta código arbitrario en tu máquina, solo rellena una
-plantilla segura. El agente se entrena con un motor **PPO propio, escrito
-en PyTorch** (no una caja negra externa), y el resultado se transmite en
-vivo al navegador por WebSocket, donde un motor gráfico en
-[three.js](https://threejs.org/) lo dibuja en 3D.
+**Si es clasificación de texto** → devuelve un `TaskSpec` con:
+- **`labels`**: las clases posibles (ej. `spam`, `not_spam`).
+- **`seed_examples`**: 20-60 ejemplos sintéticos generados por la IA para
+  arrancar el entrenamiento (tú puedes añadir ejemplos reales después).
+
+Cualquiera de los dos JSON lo interpreta siempre el mismo código auditado
+- `ParametricEnv` con física real vía [pymunk](https://www.pymunk.org/), o
+`TextClassifierTask` con TF-IDF + un clasificador lineal de
+[scikit-learn](https://scikit-learn.org/) - la IA nunca ejecuta código
+arbitrario en tu máquina, solo rellena una plantilla segura.
+
+El resultado se transmite en vivo al navegador por WebSocket, donde el
+**mismo motor gráfico** en [three.js](https://threejs.org/) lo dibuja en
+3D: en control físico son cuerpos con física real; en clasificación, cada
+ejemplo es un punto cuya posición viene de proyectar su vector de texto a
+2D (TruncatedSVD), coloreado por clase - así ves las clases separarse en
+el espacio a medida que el modelo aprende.
 
 ```
 backend/
   aiengine/
     envs/
       base.py       -> contrato Environment (reset/step/render_state)
-      parametric.py -> motor genérico: interpreta un TaskSpec (JSON) con
-                        pymunk, sin importar qué tarea describa
+      parametric.py -> motor genérico de control físico: interpreta un
+                        TaskSpec con pymunk, sin importar qué tarea describa
       registry.py   -> tareas generadas en esta sesión (en memoria)
+    classification/
+      engine.py     -> motor de clasificación: TF-IDF + SGDClassifier
+                        incremental, con proyección 2D para visualizar
     generation/
-      schema.py         -> esquema del TaskSpec + prompt de sistema
+      schema.py         -> los dos esquemas de TaskSpec + prompt de sistema
       task_generator.py -> llama a Groq o Claude (tool-use/function-calling
-                            forzado) para traducir texto libre a un
-                            TaskSpec validado
+                            forzado, el modelo elige qué esquema usar) y
+                            valida/repara lo que devuelve
     training/
-      ppo.py         -> motor PPO (PyTorch) propio, agnóstico a la tarea
+      ppo.py         -> motor PPO (PyTorch) propio, para tareas de control
     server/
-      app.py         -> servidor FastAPI (REST + WebSocket) que sirve el frontend
+      app.py         -> servidor FastAPI (REST + WebSocket), enruta cada
+                        tarea a su motor y sirve el frontend
 frontend/
   index.html, js/, css/ -> visor 3D (three.js) + panel de control, sin build step
 run.py              -> arranca todo con un solo comando
 setup.sh / setup.ps1 -> instalación con un solo comando
 ```
 
-Ver `backend/aiengine/generation/schema.py` para el esquema completo del
-TaskSpec y `backend/aiengine/envs/parametric.py` para cómo se interpreta.
+Ver `backend/aiengine/generation/schema.py` para los esquemas completos,
+`backend/aiengine/envs/parametric.py` y `backend/aiengine/classification/engine.py`
+para cómo se interpretan.
 
 ---
 
@@ -168,6 +205,10 @@ La capa gratuita de Groq tiene un límite de tokens por minuto bastante
 bajo. Espera unos segundos y vuelve a intentarlo, o usa una clave de
 Anthropic en su lugar.
 
+**"El modelo aun no se ha entrenado" al probar una clasificación**
+Pulsa "Iniciar entrenamiento" al menos una vez antes de usar el cuadro
+"Probar el modelo entrenado".
+
 ---
 
 ## 🗺️ Estado del proyecto y roadmap
@@ -178,8 +219,10 @@ cerrado. Contribuciones bienvenidas. Ideas de siguientes pasos:
 - [ ] Guardado/carga de checkpoints y reanudación de entrenamientos.
 - [ ] Entrenamiento vectorizado (múltiples entornos en paralelo) para acelerar.
 - [ ] Persistir tareas generadas entre sesiones (hoy solo viven en memoria).
-- [ ] Soporte de proveedores de IA locales (Ollama) para no depender de ninguna API.
-- [ ] Ampliar el TaskSpec (multi-agente, más formas, sensores tipo raycast).
+- [ ] Soporte de proveedores de IA locales (Ollama) para no depender de ninguna API externa.
+- [ ] Ampliar el TaskSpec de control (multi-agente, más formas, sensores tipo raycast).
+- [ ] Subir un CSV propio como datos iniciales para clasificación, en vez de solo ejemplos sintéticos.
+- [ ] Clasificación de más de un campo de texto a la vez (ej. asunto + cuerpo de un email).
 - [ ] Exportar/compartir tareas generadas como fichero JSON.
 
 ## 🤝 Contribuir

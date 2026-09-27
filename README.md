@@ -1,18 +1,120 @@
-# AI Training Playground
+# 🎮 AI Training Playground
 
-Plataforma **open-source** que corre 100% en local: describe con tus
-propias palabras la tarea que quieres que una IA aprenda a hacer, y la
-plataforma la construye, la entrena por refuerzo y te muestra el resultado
-en un motor gráfico 3D en tiempo real, directamente en tu navegador.
+**Escribe la tarea que quieres que una IA aprenda a hacer, en tu propio idioma. La plataforma la construye, la entrena por refuerzo, y ves el resultado en 3D en vivo, en tu navegador.**
 
-No hay un menú de tareas predefinidas. Escribes algo como:
+100% open-source. Corre en tu propio ordenador, con tus propios datos.
+No hay ningún menú de tareas predefinidas: tú decides qué se entrena.
 
-> "Un agente que empuje un balón hasta una portería, evitando un obstáculo por el medio"
+```
+Tú escribes:  "Un agente que empuje un balón hasta una portería,
+               evitando un obstáculo por el medio"
+                        │
+                        ▼
+        La IA construye la tarea automáticamente
+                        │
+                        ▼
+   Se entrena un agente de refuerzo (PPO) y lo ves aprender
+        en vivo, en 3D, en tu propio navegador
+```
 
-y la IA traduce eso en una tarea entrenable (entidades, física, recompensa)
-que el motor genérico interpreta y entrena al momento.
+No necesitas saber nada de aprendizaje por refuerzo, física, ni redes
+neuronales para usarlo. Si sabes escribir una frase, sabes usar esto.
 
-## Arquitectura
+---
+
+## 🚀 Empezar en 3 pasos
+
+**Requisitos:** tener [Python 3.10+](https://www.python.org/downloads/) instalado (marca "Add to PATH" durante la instalación en Windows).
+
+### 1. Descarga el proyecto
+
+```bash
+git clone https://github.com/HMJ07/ai-training-playground.git
+cd ai-training-playground
+```
+
+(o pulsa el botón verde "Code → Download ZIP" en GitHub si no usas git)
+
+### 2. Instálalo con un solo comando
+
+**Windows (PowerShell):**
+```powershell
+.\setup.ps1
+```
+
+**macOS / Linux:**
+```bash
+./setup.sh
+```
+
+Esto crea un entorno virtual, instala todo lo necesario (tarda unos
+minutos la primera vez por PyTorch) y te prepara un fichero `.env`.
+
+### 3. Consigue una clave de API gratis y arráncalo
+
+Abre el fichero `.env` que se acaba de crear y pon **una** de estas dos
+claves (con cualquiera de las dos funciona):
+
+- **Groq** (recomendado, gratis y muy rápido): consíguela en [console.groq.com/keys](https://console.groq.com/keys)
+- **Anthropic / Claude**: consíguela en [console.anthropic.com](https://console.anthropic.com/)
+
+```
+GROQ_API_KEY=tu_clave_aqui
+```
+
+Y arranca:
+
+```bash
+# Windows
+.venv\Scripts\python run.py
+
+# macOS / Linux
+.venv/bin/python run.py
+```
+
+Se abrirá `http://127.0.0.1:8000` en tu navegador automáticamente. Escribe
+tu tarea, pulsa **"Generar tarea con IA"**, y luego **"Iniciar
+entrenamiento"**. Verás al agente aprendiendo en vivo en 3D, junto con sus
+métricas (recompensa por episodio, media móvil).
+
+> **¿Algo no funciona?** Mira la sección [Solución de problemas](#-solución-de-problemas) más abajo.
+
+---
+
+## 💡 Ejemplos de tareas que puedes escribir
+
+- "Un agente que aprenda a esquivar obstáculos mientras cruza el campo"
+- "Un jugador que empuje una pelota roja hacia una zona verde, evitando la zona azul"
+- "Un agente que persiga un objetivo que se mueve"
+- "Algo que aprenda a mantener el equilibrio en el centro del campo"
+
+La IA traduce cualquier descripción razonable a una tarea física 2D
+(entidades, física, recompensa). Cuanto más concreta seas sobre qué debe
+tocar, evitar o alcanzar el agente, mejor sale la tarea generada.
+
+---
+
+## 🧠 Cómo funciona por dentro
+
+Nada de "caja negra": cuando escribes una tarea, un modelo de lenguaje
+(Groq o Claude, a tu elección) no genera código - genera **datos**, un
+`TaskSpec` en JSON con un esquema fijo:
+
+- **`entities`**: círculos o cajas en un plano 2D (posición, color, masa,
+  si son estáticas como un objetivo o un obstáculo).
+- **`action`**: qué entidad controla el agente, empujándola con una fuerza
+  2D continua.
+- **`reward_terms`**: piezas de recompensa componibles (acercarse a algo,
+  alcanzar un objetivo, penalizar salirse del campo, penalizar tiempo o
+  velocidad).
+
+Ese JSON lo interpreta siempre el mismo código auditado
+(`ParametricEnv`, con física real vía [pymunk](https://www.pymunk.org/)) -
+la IA nunca ejecuta código arbitrario en tu máquina, solo rellena una
+plantilla segura. El agente se entrena con un motor **PPO propio, escrito
+en PyTorch** (no una caja negra externa), y el resultado se transmite en
+vivo al navegador por WebSocket, donde un motor gráfico en
+[three.js](https://threejs.org/) lo dibuja en 3D.
 
 ```
 backend/
@@ -24,61 +126,69 @@ backend/
       registry.py   -> tareas generadas en esta sesión (en memoria)
     generation/
       schema.py         -> esquema del TaskSpec + prompt de sistema
-      task_generator.py -> llama a la API de Claude (tool-use forzado) para
-                            traducir texto libre a un TaskSpec validado
+      task_generator.py -> llama a Groq o Claude (tool-use/function-calling
+                            forzado) para traducir texto libre a un
+                            TaskSpec validado
     training/
       ppo.py         -> motor PPO (PyTorch) propio, agnóstico a la tarea
     server/
       app.py         -> servidor FastAPI (REST + WebSocket) que sirve el frontend
 frontend/
   index.html, js/, css/ -> visor 3D (three.js) + panel de control, sin build step
-run.py            -> arranca todo con un solo comando
+run.py              -> arranca todo con un solo comando
+setup.sh / setup.ps1 -> instalación con un solo comando
 ```
 
-Nada de esto ejecuta código generado por la IA: el modelo solo devuelve
-datos (un JSON con un esquema fijo — entidades, cuál controla el agente,
-términos de recompensa), y `ParametricEnv` es el único código que
-realmente simula la física e interpreta esos datos. Esto hace que
-cualquier tarea que la IA proponga sea segura de correr en tu máquina.
+Ver `backend/aiengine/generation/schema.py` para el esquema completo del
+TaskSpec y `backend/aiengine/envs/parametric.py` para cómo se interpreta.
 
-## Cómo ejecutarlo
+---
 
-```bash
-pip install -r requirements.txt
-cp .env.example .env   # y pon tu ANTHROPIC_API_KEY (console.anthropic.com)
-python run.py
-```
+## 🛠️ Solución de problemas
 
-Esto abre `http://127.0.0.1:8000` en tu navegador. Escribe la tarea que
-quieres entrenar, pulsa "Generar tarea con IA", y cuando esté lista pulsa
-"Iniciar entrenamiento" para verla aprender en vivo junto con sus métricas
-(recompensa por episodio, media móvil).
+**"ModuleNotFoundError: No module named 'torch'"**
+Estás usando el Python del sistema en vez del entorno virtual del
+proyecto. Usa `.venv\Scripts\python run.py` (Windows) o
+`.venv/bin/python run.py` (macOS/Linux), no solo `python run.py`.
 
-## Cómo funciona el TaskSpec
+**"Falta una clave de API"**
+No has puesto ninguna clave en `.env`, o el fichero no se llama
+exactamente `.env` (no `.env.txt`). Revisa el paso 3.
 
-Un TaskSpec describe la tarea completamente como datos:
+**El puerto 8000 ya está en uso**
+Cierra cualquier otro proceso que lo esté usando, o cambia `PORT` en
+`run.py`.
 
-- **`entities`**: círculos o cajas en un plano 2D (posición, color, masa,
-  si son estáticas como un objetivo/obstáculo).
-- **`action`**: qué entidad controla el agente, empujándola con una fuerza
-  2D continua.
-- **`reward_terms`**: piezas componibles (acercarse a algo, alcanzar un
-  objetivo, penalizar salirse del campo, penalizar tiempo/velocidad).
+**La instalación tarda mucho / se cuelga**
+PyTorch pesa varios cientos de MB; en una conexión lenta puede tardar
+varios minutos. Es normal.
 
-Ver `backend/aiengine/generation/schema.py` para el esquema completo y
-`backend/aiengine/envs/parametric.py` para cómo se interpreta.
+**"rate_limit_exceeded" al generar una tarea con Groq**
+La capa gratuita de Groq tiene un límite de tokens por minuto bastante
+bajo. Espera unos segundos y vuelve a intentarlo, o usa una clave de
+Anthropic en su lugar.
 
-## Estado del proyecto
+---
 
-MVP funcional pensado como base extensible. Ideas de siguientes pasos
-(contribuciones bienvenidas):
+## 🗺️ Estado del proyecto y roadmap
 
-- Guardado/carga de checkpoints y reanudación de entrenamientos.
-- Entrenamiento vectorizado (múltiples entornos en paralelo) para acelerar.
-- Persistir tareas generadas entre sesiones (hoy solo viven en memoria).
-- Soporte de proveedores de IA locales (Ollama) como alternativa a la API.
-- Ampliar el TaskSpec (multi-agente, más formas, sensores tipo raycast).
+Esto es un MVP funcional pensado como base extensible, no un producto
+cerrado. Contribuciones bienvenidas. Ideas de siguientes pasos:
 
-## Licencia
+- [ ] Guardado/carga de checkpoints y reanudación de entrenamientos.
+- [ ] Entrenamiento vectorizado (múltiples entornos en paralelo) para acelerar.
+- [ ] Persistir tareas generadas entre sesiones (hoy solo viven en memoria).
+- [ ] Soporte de proveedores de IA locales (Ollama) para no depender de ninguna API.
+- [ ] Ampliar el TaskSpec (multi-agente, más formas, sensores tipo raycast).
+- [ ] Exportar/compartir tareas generadas como fichero JSON.
 
-MIT. Ver [LICENSE](LICENSE).
+## 🤝 Contribuir
+
+Los pull requests son bienvenidos. Si añades un tipo de término de
+recompensa nuevo o una forma de entidad nueva, actualiza también
+`schema.py` (el esquema que ve la IA) y `parametric.py` (cómo se
+interpreta) a la vez.
+
+## 📄 Licencia
+
+MIT. Ver [LICENSE](LICENSE) - úsalo, modifícalo y compártelo libremente.

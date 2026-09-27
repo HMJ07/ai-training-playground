@@ -8,3 +8,4 @@ venv/
 .idea/
 *.log
 checkpoints/
+.env

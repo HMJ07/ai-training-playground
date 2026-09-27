@@ -1,8 +1,15 @@
 import { renderTick } from "./scene.js";
 
-const taskSelect = document.getElementById("task-select");
+const taskInput = document.getElementById("task-input");
+const generateBtn = document.getElementById("generate-btn");
+const generateStatus = document.getElementById("generate-status");
+const taskResult = document.getElementById("task-result");
+const taskNameEl = document.getElementById("task-name");
+const taskDescriptionEl = document.getElementById("task-description");
 const startBtn = document.getElementById("start-btn");
 const stopBtn = document.getElementById("stop-btn");
+
+let currentTaskId = null;
 
 const mStep = document.getElementById("m-step");
 const mEpisode = document.getElementById("m-episode");
@@ -15,15 +22,41 @@ const returnHistory = [];
 
 let socket = null;
 
-async function loadTasks() {
-  const res = await fetch("/api/tasks");
-  const tasks = await res.json();
-  taskSelect.innerHTML = "";
-  for (const task of tasks) {
-    const opt = document.createElement("option");
-    opt.value = task.id;
-    opt.textContent = `${task.name} - ${task.description}`;
-    taskSelect.appendChild(opt);
+async function generateTask() {
+  const description = taskInput.value.trim();
+  if (!description) {
+    generateStatus.textContent = "Escribe primero qué quieres que aprenda.";
+    return;
+  }
+
+  generateBtn.disabled = true;
+  startBtn.disabled = true;
+  taskResult.classList.add("hidden");
+  generateStatus.textContent = "Generando tarea con la IA...";
+
+  try {
+    const res = await fetch("/api/tasks/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      generateStatus.textContent = data.error;
+      return;
+    }
+
+    currentTaskId = data.task.id;
+    taskNameEl.textContent = data.task.name;
+    taskDescriptionEl.textContent = data.task.description;
+    taskResult.classList.remove("hidden");
+    generateStatus.textContent = "Tarea lista.";
+    startBtn.disabled = false;
+  } catch (err) {
+    generateStatus.textContent = "No se pudo generar la tarea: " + err;
+  } finally {
+    generateBtn.disabled = false;
   }
 }
 
@@ -76,10 +109,12 @@ function drawChart() {
   chartCtx.stroke();
 }
 
+generateBtn.addEventListener("click", generateTask);
+
 startBtn.addEventListener("click", async () => {
+  if (!currentTaskId) return;
   connectSocket();
-  const taskId = taskSelect.value;
-  await fetch(`/api/train/start/${taskId}`, { method: "POST" });
+  await fetch(`/api/train/start/${currentTaskId}`, { method: "POST" });
   startBtn.disabled = true;
   stopBtn.disabled = false;
 });
@@ -89,5 +124,3 @@ stopBtn.addEventListener("click", async () => {
   startBtn.disabled = false;
   stopBtn.disabled = true;
 });
-
-loadTasks();

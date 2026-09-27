@@ -1,38 +1,34 @@
-"""Registry so new tasks can be plugged in without touching the server code."""
+"""In-memory registry of tasks generated from user descriptions this session.
+
+There is no fixed menu of tasks: every entry here was produced by the
+generator (`aiengine.generation.task_generator`) from free text typed by
+the user, and is interpreted generically by `ParametricEnv`.
+"""
 
 from __future__ import annotations
 
-from typing import Callable
-
 from .base import Environment
+from .parametric import ParametricEnv
 
-_REGISTRY: dict[str, Callable[[], Environment]] = {}
+_TASKS: dict[str, dict] = {}
 
 
-def register_task(task_id: str):
-    """Class decorator: `@register_task("score_goal")`."""
-
-    def _wrap(cls):
-        _REGISTRY[task_id] = cls
-        return cls
-
-    return _wrap
+def register_task(task_id: str, spec: dict) -> None:
+    _TASKS[task_id] = spec
 
 
 def create_task(task_id: str) -> Environment:
-    if task_id not in _REGISTRY:
-        raise KeyError(f"Unknown task '{task_id}'. Available: {list(_REGISTRY)}")
-    return _REGISTRY[task_id]()
+    if task_id not in _TASKS:
+        raise KeyError(f"Unknown task '{task_id}'. Available: {list(_TASKS)}")
+    return ParametricEnv(_TASKS[task_id])
+
+
+def get_spec(task_id: str) -> dict:
+    return _TASKS[task_id]
 
 
 def list_tasks() -> list[dict[str, str]]:
-    out = []
-    for task_id, cls in _REGISTRY.items():
-        out.append(
-            {
-                "id": task_id,
-                "name": getattr(cls, "name", task_id),
-                "description": getattr(cls, "description", ""),
-            }
-        )
-    return out
+    return [
+        {"id": task_id, "name": spec.get("name", task_id), "description": spec.get("description", "")}
+        for task_id, spec in _TASKS.items()
+    ]

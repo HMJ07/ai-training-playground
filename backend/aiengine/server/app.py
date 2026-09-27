@@ -1,7 +1,8 @@
 """Local web server: serves the frontend and streams training in real time.
 
 Run with `python run.py` from the repo root. Everything happens on
-localhost, nothing is sent anywhere else.
+localhost except the one call to the Claude API that turns your task
+description into a TaskSpec.
 """
 
 from __future__ import annotations
@@ -9,13 +10,19 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import uuid
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-from aiengine.envs.registry import create_task, list_tasks
+from aiengine.envs.registry import create_task, get_spec, list_tasks, register_task
+from aiengine.generation.task_generator import TaskGenerationError, generate_task_spec
 from aiengine.training.ppo import PPOConfig, PPOTrainer, TrainingMetrics
+
+load_dotenv()
 
 FRONTEND_DIR = Path(__file__).resolve().parents[3] / "frontend"
 
@@ -76,9 +83,33 @@ class TrainingSession:
 session = TrainingSession()
 
 
+class GenerateTaskRequest(BaseModel):
+    description: str
+
+
+@app.post("/api/tasks/generate")
+def generate_task(req: GenerateTaskRequest):
+    description = req.description.strip()
+    if not description:
+        return {"error": "Describe la tarea que quieres entrenar."}
+    try:
+        spec = generate_task_spec(description)
+    except TaskGenerationError as exc:
+        return {"error": str(exc)}
+
+    task_id = f"{spec.get('name', 'task').lower().replace(' ', '_')}_{uuid.uuid4().hex[:6]}"
+    register_task(task_id, spec)
+    return {"task": {"id": task_id, "name": spec["name"], "description": spec["description"]}, "spec": spec}
+
+
 @app.get("/api/tasks")
 def get_tasks():
     return list_tasks()
+
+
+@app.get("/api/tasks/{task_id}")
+def get_task_spec(task_id: str):
+    return get_spec(task_id)
 
 
 @app.post("/api/train/start/{task_id}")
@@ -104,12 +135,5 @@ async def ws_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         session.clients.discard(websocket)
 
-
-# Import example tasks so their @register_task decorators run.
-def _load_builtin_tasks() -> None:
-    from examples import score_goal  # noqa: F401
-
-
-_load_builtin_tasks()
 
 app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

@@ -1,70 +1,83 @@
 # AI Training Playground
 
-Plataforma **open-source** que corre 100% en local: entrena un agente de
-aprendizaje por refuerzo para **cualquier tarea que definas** y observa el
-resultado en un motor gráfico 3D en tiempo real, directamente en tu
-navegador.
+Plataforma **open-source** que corre 100% en local: describe con tus
+propias palabras la tarea que quieres que una IA aprenda a hacer, y la
+plataforma la construye, la entrena por refuerzo y te muestra el resultado
+en un motor gráfico 3D en tiempo real, directamente en tu navegador.
 
-Ejemplos de lo que puedes construir con el mismo motor:
-- Un agente que aprenda a meter un balón en una portería.
-- Un agente que aprenda a diferenciar colores o clasificar caras.
-- Cualquier tarea que puedas expresar como un entorno con estado, acciones
-  y una recompensa.
+No hay un menú de tareas predefinidas. Escribes algo como:
+
+> "Un agente que empuje un balón hasta una portería, evitando un obstáculo por el medio"
+
+y la IA traduce eso en una tarea entrenable (entidades, física, recompensa)
+que el motor genérico interpreta y entrena al momento.
 
 ## Arquitectura
 
 ```
 backend/
   aiengine/
-    envs/        -> contrato Environment + registro de tareas
-    training/     -> motor PPO (PyTorch), agnóstico a la tarea
-    server/       -> servidor FastAPI (REST + WebSocket) que sirve el frontend
-  examples/
-    score_goal.py -> tarea de ejemplo: marcar un gol (física con pymunk)
+    envs/
+      base.py       -> contrato Environment (reset/step/render_state)
+      parametric.py -> motor genérico: interpreta un TaskSpec (JSON) con
+                        pymunk, sin importar qué tarea describa
+      registry.py   -> tareas generadas en esta sesión (en memoria)
+    generation/
+      schema.py         -> esquema del TaskSpec + prompt de sistema
+      task_generator.py -> llama a la API de Claude (tool-use forzado) para
+                            traducir texto libre a un TaskSpec validado
+    training/
+      ppo.py         -> motor PPO (PyTorch) propio, agnóstico a la tarea
+    server/
+      app.py         -> servidor FastAPI (REST + WebSocket) que sirve el frontend
 frontend/
   index.html, js/, css/ -> visor 3D (three.js) + panel de control, sin build step
 run.py            -> arranca todo con un solo comando
 ```
 
-El backend y el frontend hablan mediante un contrato genérico
-(`render_state()` en cada tarea → JSON de entidades) para que el motor
-gráfico nunca necesite saber nada específico de la tarea.
+Nada de esto ejecuta código generado por la IA: el modelo solo devuelve
+datos (un JSON con un esquema fijo — entidades, cuál controla el agente,
+términos de recompensa), y `ParametricEnv` es el único código que
+realmente simula la física e interpreta esos datos. Esto hace que
+cualquier tarea que la IA proponga sea segura de correr en tu máquina.
 
 ## Cómo ejecutarlo
 
 ```bash
 pip install -r requirements.txt
+cp .env.example .env   # y pon tu ANTHROPIC_API_KEY (console.anthropic.com)
 python run.py
 ```
 
-Esto abre `http://127.0.0.1:8000` en tu navegador. Elige una tarea, pulsa
-"Iniciar entrenamiento" y verás al agente aprendiendo en vivo, junto con
-sus métricas (recompensa por episodio, media móvil).
+Esto abre `http://127.0.0.1:8000` en tu navegador. Escribe la tarea que
+quieres entrenar, pulsa "Generar tarea con IA", y cuando esté lista pulsa
+"Iniciar entrenamiento" para verla aprender en vivo junto con sus métricas
+(recompensa por episodio, media móvil).
 
-## Cómo añadir tu propia tarea
+## Cómo funciona el TaskSpec
 
-1. Crea un fichero en `backend/examples/mi_tarea.py`.
-2. Define una clase que herede de `aiengine.envs.base.Environment` e
-   implemente `reset`, `step` y `render_state` (ver `score_goal.py` como
-   plantilla).
-3. Decórala con `@register_task("mi_tarea")`.
-4. Impórtala en `aiengine/server/app.py::_load_builtin_tasks` (o crea tu
-   propio paquete de tareas e impórtalo igual).
-5. Reinicia el servidor: tu tarea aparecerá en el selector automáticamente.
+Un TaskSpec describe la tarea completamente como datos:
 
-El motor de entrenamiento (PPO) es completamente agnóstico a la tarea:
-solo necesita `observation_space`, `action_space`, `reset` y `step`.
+- **`entities`**: círculos o cajas en un plano 2D (posición, color, masa,
+  si son estáticas como un objetivo/obstáculo).
+- **`action`**: qué entidad controla el agente, empujándola con una fuerza
+  2D continua.
+- **`reward_terms`**: piezas componibles (acercarse a algo, alcanzar un
+  objetivo, penalizar salirse del campo, penalizar tiempo/velocidad).
+
+Ver `backend/aiengine/generation/schema.py` para el esquema completo y
+`backend/aiengine/envs/parametric.py` para cómo se interpreta.
 
 ## Estado del proyecto
 
-Esto es un MVP funcional pensado como base extensible, no un producto
-terminado. Ideas de siguientes pasos (contribuciones bienvenidas):
+MVP funcional pensado como base extensible. Ideas de siguientes pasos
+(contribuciones bienvenidas):
 
-- Soporte para espacios de acción discretos y observaciones tipo imagen.
-- Más algoritmos (SAC, DQN) seleccionables desde la UI.
 - Guardado/carga de checkpoints y reanudación de entrenamientos.
 - Entrenamiento vectorizado (múltiples entornos en paralelo) para acelerar.
-- Editor visual de tareas (definir entidades, física y recompensa sin código).
+- Persistir tareas generadas entre sesiones (hoy solo viven en memoria).
+- Soporte de proveedores de IA locales (Ollama) como alternativa a la API.
+- Ampliar el TaskSpec (multi-agente, más formas, sensores tipo raycast).
 
 ## Licencia
 

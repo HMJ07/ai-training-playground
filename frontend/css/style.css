@@ -44,13 +44,41 @@ main {
   margin-bottom: 0.3rem;
 }
 
-.controls select {
+.controls select,
+.controls textarea {
   width: 100%;
   padding: 0.5rem;
   background: #0d1117;
   color: #e6edf3;
   border: 1px solid #30363d;
   border-radius: 6px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.status {
+  font-size: 0.8rem;
+  color: #8b949e;
+  min-height: 1.2em;
+  margin: 0.3rem 0 0;
+}
+
+.task-result {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.6rem;
+  margin: 0.5rem 0;
+}
+
+.task-result p {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: #8b949e;
+}
+
+.hidden {
+  display: none;
 }
 
 .buttons {

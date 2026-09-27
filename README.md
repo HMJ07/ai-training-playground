@@ -1,37 +1,34 @@
 # 🎮 AI Training Playground
 
-**Escribe la tarea que quieres que una IA aprenda a hacer, en tu propio idioma. La plataforma la construye, la entrena, y ves el resultado en 3D en vivo, en tu navegador.**
+**Describe en lenguaje natural una tarea de control físico simple (mover, perseguir, esquivar, alcanzar) o de clasificación de texto (spam, sentimiento, tema...), y entrena un agente para ella en vivo, en 3D, en tu navegador.**
 
 100% open-source y **100% gratis** (sin ninguna API de pago). Corre en tu
-propio ordenador, con tus propios datos. No hay ningún menú de tareas
-predefinidas: tú decides qué se entrena, y la plataforma detecta sola qué
-tipo de tarea es.
+propio ordenador, con tus propios datos.
 
-```
-Tú escribes:  "Un agente que empuje un balón hasta una portería"     "Que aprenda a distinguir llamadas de spam"
-                        │                                                          │
-                        ▼                                                          ▼
-              Tarea de CONTROL FÍSICO                                 Tarea de CLASIFICACIÓN DE TEXTO
-              (se entrena con RL / PPO)                                (se entrena con TF-IDF + SGD)
-                        │                                                          │
-                        └───────────────────────┬──────────────────────────────────┘
-                                                  ▼
-                       Lo ves aprender en vivo, en 3D, en tu propio navegador
-```
+## ⚠️ Qué es esto (y qué NO es)
 
-No necesitas saber nada de aprendizaje por refuerzo, machine learning ni
-redes neuronales para usarlo. Si sabes escribir una frase, sabes usar esto.
+Esto **no** es una IA general que "hace lo que le pidas". Es un motor
+concreto con dos moldes fijos:
 
-**Dos familias de tareas, un mismo motor gráfico:**
+- 🎯 **Control físico 2D**: un agente que empuja/mueve un objeto simple
+  (círculo o caja) en un plano, con una recompensa numérica por
+  acercarse/alcanzar/evitar algo. Se entrena de verdad con PPO
+  (aprendizaje por refuerzo) en segundos-minutos, en tu CPU.
+- 🏷️ **Clasificación de texto**: separar frases en 2-6 categorías
+  (spam/no-spam, positivo/negativo...). Se entrena de verdad con un
+  clasificador TF-IDF + SGD local.
 
-- 🎯 **Control físico** — cualquier cosa sobre mover, empujar, alcanzar,
-  perseguir o esquivar algo en un espacio 2D. Se entrena con un motor PPO
-  (aprendizaje por refuerzo) propio.
-- 🏷️ **Clasificación de texto** — cualquier cosa sobre decidir a qué
-  categoría pertenece un texto: spam/no-spam, positivo/negativo, urgente/no
-  urgente, tema, intención... Se entrena con un clasificador TF-IDF + SGD
-  local (scikit-learn). Puedes añadir tus propios ejemplos reales y probar
-  el modelo entrenado con texto nuevo, en vivo.
+**Si le pides algo que no encaja en ninguno de los dos moldes** (un mundo
+3D realista, personajes con movimiento humano de verdad, entender y
+ejecutar instrucciones distintas por "cliente" o "pedido", cualquier cosa
+que necesite razonamiento o memoria más allá de una recompensa numérica),
+**la IA generadora improvisará una aproximación con círculos, cajas y
+"acércate a esto"** - no porque falle al azar, sino porque no tiene otra
+pieza que ofrecer. El resultado se notará forzado. Eso no es un bug que
+se vaya a arreglar con un parche: es el límite real de lo que este tipo
+de motor (RL simple + clasificador lineal, gratis, en tu CPU) puede
+representar. Mira los ejemplos de abajo para hacerte una idea de qué
+funciona bien.
 
 ---
 
@@ -108,10 +105,11 @@ métricas (recompensa por episodio, media móvil).
 - "Detectar si un email es urgente o puede esperar"
 - "Clasificar mensajes de soporte por tema: facturación, técnico o cuenta"
 
-La IA decide sola qué familia de tarea encaja con lo que describes.
+La IA decide sola cuál de las dos familias encaja con lo que describes.
 Cuanto más concreta seas sobre qué debe tocar/evitar/alcanzar (control) o
 qué categorías existen y cómo distinguirlas (clasificación), mejor sale
-la tarea generada.
+la tarea generada. Fuera de estos dos patrones (mover algo simple / meter
+frases en categorías), no esperes que el resultado tenga sentido.
 
 ---
 

@@ -22,7 +22,25 @@
 
       <div id="task-result" class="task-result hidden">
         <strong id="task-name"></strong>
+        <span id="task-kind-badge" class="badge"></span>
         <p id="task-description"></p>
+      </div>
+
+      <div id="classification-panel" class="hidden">
+        <label for="example-text">Añadir ejemplo real (opcional, mejora el modelo)</label>
+        <textarea id="example-text" rows="2" placeholder="Pega aquí un ejemplo real..."></textarea>
+        <select id="example-label"></select>
+        <div class="buttons">
+          <button id="add-example-btn">Añadir ejemplo</button>
+        </div>
+        <p id="examples-status" class="status"></p>
+
+        <label for="predict-text">Probar el modelo entrenado</label>
+        <textarea id="predict-text" rows="2" placeholder="Escribe un texto para clasificar..."></textarea>
+        <div class="buttons">
+          <button id="predict-btn">Clasificar</button>
+        </div>
+        <div id="predict-result" class="task-result hidden"></div>
       </div>
 
       <div class="buttons">
@@ -31,10 +49,10 @@
       </div>
 
       <div class="metrics">
-        <div><span>Paso</span><strong id="m-step">0</strong></div>
-        <div><span>Episodio</span><strong id="m-episode">0</strong></div>
-        <div><span>Ultima recompensa</span><strong id="m-last">0</strong></div>
-        <div><span>Media (100 ep.)</span><strong id="m-mean">0</strong></div>
+        <div><span id="m-label-1">Paso</span><strong id="m-1">0</strong></div>
+        <div><span id="m-label-2">Episodio</span><strong id="m-2">0</strong></div>
+        <div><span id="m-label-3">Ultima recompensa</span><strong id="m-3">0</strong></div>
+        <div><span id="m-label-4">Media (100 ep.)</span><strong id="m-4">0</strong></div>
       </div>
 
       <canvas id="reward-chart" width="320" height="140"></canvas>
@@ -42,6 +60,7 @@
 
     <section class="panel viewer">
       <div id="scene-container"></div>
+      <p class="viewer-hint" id="viewer-hint"></p>
     </section>
   </main>
 

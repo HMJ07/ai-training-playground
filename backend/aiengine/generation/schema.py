@@ -1,17 +1,27 @@
-"""JSON schema for a TaskSpec, and the tool definition sent to the LLM.
+"""JSON schemas for TaskSpecs, and the tool definitions sent to the LLM.
 
-A TaskSpec never contains executable code - only data describing entities,
-which one the agent controls, and a list of composable reward terms. This
-is what makes it safe to build from an LLM's output and interpret with
-`aiengine.envs.parametric.ParametricEnv`.
+A TaskSpec never contains executable code - only data. Two kinds exist,
+covering two very different families of "things you might want to train":
+
+- CONTROL_TASK_TOOL: a 2D physics task (push/reach/avoid) - interpreted by
+  `aiengine.envs.parametric.ParametricEnv` and trained with PPO.
+- CLASSIFICATION_TASK_TOOL: a text classification task (spam vs not spam,
+  sentiment, topic, ...) - interpreted by
+  `aiengine.classification.engine.TextClassifierTask` and trained with an
+  incremental linear classifier over TF-IDF features.
+
+The LLM picks whichever tool matches the user's request; both only ever
+produce data, never code, so whichever comes back is safe to run locally.
 """
 
-TASK_SPEC_TOOL = {
-    "name": "define_task",
+CONTROL_TASK_TOOL = {
+    "name": "define_control_task",
     "description": (
         "Define a 2D physics reinforcement-learning task as data: the entities "
         "in the scene, which single entity the agent controls with a 2D force, "
-        "and a list of reward terms that combine to score the agent's behaviour."
+        "and a list of reward terms that combine to score the agent's behaviour. "
+        "Use this for anything about an agent moving, pushing, reaching, chasing, "
+        "avoiding or balancing something in a physical space."
     ),
     "input_schema": {
         "type": "object",
@@ -123,10 +133,66 @@ TASK_SPEC_TOOL = {
     },
 }
 
-SYSTEM_PROMPT = """You translate a plain-language task description into a TaskSpec \
-for a 2D physics reinforcement-learning sandbox, by calling the `define_task` tool.
+CLASSIFICATION_TASK_TOOL = {
+    "name": "define_classification_task",
+    "description": (
+        "Define a text classification task as data: the possible labels, a "
+        "description of what the input text looks like, and a seed set of "
+        "labeled examples to bootstrap training. Use this for anything about "
+        "deciding which category a piece of text belongs to - e.g. spam vs not "
+        "spam, positive vs negative review, urgent vs not urgent, topic tagging."
+    ),
+    "input_schema": {
+        "type": "object",
+        "required": ["name", "description", "labels", "input_description", "seed_examples"],
+        "properties": {
+            "name": {"type": "string", "description": "Short human-readable task name."},
+            "description": {"type": "string", "description": "One sentence describing the task."},
+            "labels": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 6,
+                "items": {"type": "string"},
+                "description": "The possible class names, e.g. ['spam', 'not_spam'].",
+            },
+            "input_description": {
+                "type": "string",
+                "description": "What the text being classified represents, e.g. 'the transcript or description of a phone call'.",
+            },
+            "seed_examples": {
+                "type": "array",
+                "minItems": 20,
+                "maxItems": 60,
+                "description": (
+                    "Realistic synthetic examples to bootstrap the classifier, roughly "
+                    "balanced across all labels. These are a starting point, not real "
+                    "data - the user can add real examples afterwards."
+                ),
+                "items": {
+                    "type": "object",
+                    "required": ["text", "label"],
+                    "properties": {
+                        "text": {"type": "string"},
+                        "label": {"type": "string", "description": "Must be one of `labels`."},
+                    },
+                },
+            },
+        },
+    },
+}
 
-Rules:
+TOOLS = [CONTROL_TASK_TOOL, CLASSIFICATION_TASK_TOOL]
+
+SYSTEM_PROMPT = """You translate a plain-language task description into a TaskSpec \
+by calling exactly one tool: `define_control_task` for a physical control task \
+(an agent moving, pushing, reaching, chasing, avoiding or balancing something in \
+a 2D space), or `define_classification_task` for a text classification task \
+(deciding which category a piece of text belongs to, e.g. spam detection, \
+sentiment, topic tagging, urgency, intent). Pick whichever tool actually matches \
+what the user described - do not force a classification task into a physical \
+metaphor or vice versa.
+
+Rules for `define_control_task`:
 - The agent always controls exactly ONE entity by pushing it with a 2D force \
   (fx, fy). Everything else in the scene is either physics-driven (a ball that \
   gets bumped) or static (a goal marker, an obstacle).
@@ -134,11 +200,13 @@ Rules:
   and reward reaching them with `reach_bonus` and/or shape the approach with \
   `distance_delta`.
 - Always include a small `time_penalty` so the agent is encouraged to act quickly.
-- Keep entities to simple circles/boxes - this is a physics sandbox, not a \
-  photorealistic simulator. If the user's request is not really a physical \
-  control task (e.g. pure image classification), do your best to turn it into \
-  an analogous physical task (e.g. represent categories as colored zones the \
-  agent must push a matching-colored object into).
 - Pick sensible field size, forces and reward weights so the task is learnable \
   in a few hundred thousand steps of PPO.
+
+Rules for `define_classification_task`:
+- Generate at least 20 seed examples, balanced across labels as evenly as \
+  possible, and genuinely varied in phrasing, length and style so the \
+  classifier doesn't just memorize a template.
+- Make the seed examples realistic for the domain the user described (e.g. for \
+  spam-call detection, write short call-summary-style texts, not essay-length text).
 """

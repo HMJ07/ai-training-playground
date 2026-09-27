@@ -31,6 +31,7 @@ class ParametricEnv(Environment):
         self._max_steps = int(spec.get("max_steps", 300))
         self._field_w = float(spec["field"]["width"])
         self._field_h = float(spec["field"]["height"])
+        self._field_theme = spec["field"].get("theme", "plain")
 
         obs_dim = len(self._entity_ids) * 4
         self.observation_space = Space(
@@ -181,4 +182,7 @@ class ParametricEnv(Environment):
                     "color": ent.get("color", "#4f8cff"),
                 }
             )
-        return {"field": {"w": self._field_w, "h": self._field_h}, "entities": entities}
+        return {
+            "field": {"w": self._field_w, "h": self._field_h, "theme": self._field_theme},
+            "entities": entities,
+        }

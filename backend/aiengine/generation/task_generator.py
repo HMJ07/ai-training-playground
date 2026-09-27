@@ -152,6 +152,8 @@ def _generate_with_groq(description: str, api_key: str, extra_note: str | None =
 def _validate_control_spec(spec: dict) -> None:
     field = spec.get("field", {})
     field_w, field_h = float(field.get("width", 20)), float(field.get("height", 20))
+    if field.get("theme") not in ("pitch", "room", "plain"):
+        field["theme"] = "plain"
 
     # Defense in depth against the model ignoring the "no boundary entity"
     # rule in the prompt: drop any static box whose footprint covers most of

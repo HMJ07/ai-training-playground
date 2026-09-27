@@ -31,10 +31,23 @@ CONTROL_TASK_TOOL = {
             "description": {"type": "string", "description": "One sentence describing the task."},
             "field": {
                 "type": "object",
-                "required": ["width", "height"],
+                "required": ["width", "height", "theme"],
                 "properties": {
                     "width": {"type": "number", "minimum": 5, "maximum": 40},
                     "height": {"type": "number", "minimum": 5, "maximum": 40},
+                    "theme": {
+                        "type": "string",
+                        "enum": ["pitch", "room", "plain"],
+                        "description": (
+                            "How to dress the ground/surroundings - purely visual, no effect on "
+                            "physics. 'pitch': an outdoor sports field (grass, line markings, a "
+                            "stadium backdrop) - only for tasks that are actually about a sports "
+                            "pitch/court. 'room': an indoor space (a salon, office, house, warehouse "
+                            "- anything happening inside a building) - a plain floor, no stadium. "
+                            "'plain': an abstract/neutral surface for anything else (e.g. a generic "
+                            "physics puzzle with no real-world setting)."
+                        ),
+                    },
                 },
             },
             "entities": {
@@ -56,17 +69,21 @@ CONTROL_TASK_TOOL = {
                         },
                         "visual": {
                             "type": "string",
-                            "enum": ["humanoid", "ball", "goal", "plain"],
+                            "enum": ["humanoid", "ball", "goal", "marker", "plain"],
                             "description": (
                                 "How this entity is DRAWN, independent of its physics `kind`. "
                                 "'humanoid': a person/character/animal-like actor (a player, a robot with "
                                 "a body, anything that acts) - rendered as a simple articulated figure "
                                 "with a walk/kick animation; always use `kind: circle` with it. "
                                 "'ball': a ball or projectile - rendered as a textured sphere; use with "
-                                "`kind: circle`. 'goal': a goal, net, hoop or target structure - rendered "
-                                "as a real goal frame with posts and a net; use with `kind: box` sized "
-                                "[width, height] of the opening. 'plain': anything else (a wall, a zone "
-                                "marker, an obstacle, a generic object) - a plain circle or box."
+                                "`kind: circle`. 'goal': ONLY for a literal sports goal/net/hoop (soccer, "
+                                "hockey, basketball) - rendered as a real goal frame with posts and a "
+                                "net; use with `kind: box`. 'marker': any other abstract target/checkpoint/ "
+                                "zone the agent must reach that is NOT a real-world object (a spot to "
+                                "stand on, a parking space, a 'cut here' point, a finish line) - rendered "
+                                "as a flat glowing disc on the ground; use with `kind: box` or `circle`. "
+                                "'plain': a real physical object that isn't a person/ball/goal (furniture, "
+                                "a wall segment, an obstacle, a chair, a box to push) - a plain shape."
                             ),
                         },
                         "radius": {"type": "number", "description": "For kind=circle."},
@@ -251,9 +268,15 @@ Rules for `define_control_task`:
   in a few hundred thousand steps of PPO.
 - Set `visual` on every entity for realistic rendering: any person/character/ \
   animal/robot-with-a-body actor gets `visual: "humanoid"`; a ball or \
-  projectile gets `visual: "ball"`; a goal/net/hoop/target structure gets \
-  `visual: "goal"`; anything else (walls, zone markers, generic obstacles) \
-  gets `visual: "plain"`.
+  projectile gets `visual: "ball"`; a LITERAL sports goal/net/hoop gets \
+  `visual: "goal"`; an abstract target/checkpoint/zone that is not a real \
+  object (where to stand, where to cut, a finish line) gets `visual: \
+  "marker"`; any other real object (furniture, a wall, an obstacle, \
+  something to push) gets `visual: "plain"`.
+- Set `field.theme` to match the setting the description actually implies - \
+  most tasks are NOT a sports pitch. A hairdresser's salon, an office, a \
+  warehouse, a kitchen: `"room"`. Football/basketball/a literal field or \
+  court: `"pitch"`. Anything abstract with no real-world setting: `"plain"`.
 
 Rules for `define_classification_task`:
 - Generate at least 20 seed examples, balanced across labels as evenly as \

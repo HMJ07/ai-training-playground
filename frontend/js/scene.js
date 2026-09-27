@@ -112,35 +112,122 @@ function soccerBallTexture() {
   return tex;
 }
 
+function roomFloorTexture(fieldW, fieldH) {
+  const res = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = res;
+  canvas.height = Math.round((res * fieldH) / fieldW);
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#8a6d4f";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const tileSize = Math.max(8, res / (fieldW * 1.2));
+  for (let y = 0; y < canvas.height; y += tileSize) {
+    for (let x = 0; x < canvas.width; x += tileSize) {
+      const shade = (Math.floor(x / tileSize) + Math.floor(y / tileSize)) % 2 === 0 ? 10 : -6;
+      ctx.fillStyle = `rgba(0,0,0,${shade > 0 ? shade / 255 : 0})`;
+      if (shade < 0) ctx.fillStyle = `rgba(255,255,255,${-shade / 255})`;
+      ctx.fillRect(x, y, tileSize, tileSize);
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function plainFloorTexture(fieldW, fieldH) {
+  const res = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = res;
+  canvas.height = Math.round((res * fieldH) / fieldW);
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#1c2530";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  const step = Math.max(16, res / (fieldW * 2));
+  for (let x = 0; x <= canvas.width; x += step) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= canvas.height; y += step) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // ---------------------------------------------------------------------------
 // Field + stadium backdrop
 // ---------------------------------------------------------------------------
 
+const GROUND_TEXTURE_BY_THEME = { pitch: pitchTexture, room: roomFloorTexture, plain: plainFloorTexture };
+
 function buildField(fieldSpec) {
   currentFieldSpec = fieldSpec;
-  const key = `${fieldSpec.w}x${fieldSpec.h}`;
+  const theme = fieldSpec.theme ?? "plain";
+  const key = `${fieldSpec.w}x${fieldSpec.h}:${theme}`;
   if (key === fieldKey) return;
   fieldKey = key;
 
   if (field) scene.remove(field);
   if (stadium) scene.remove(stadium);
 
+  const textureFn = GROUND_TEXTURE_BY_THEME[theme] ?? plainFloorTexture;
   const group = new THREE.Group();
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(fieldSpec.w, fieldSpec.h),
-    new THREE.MeshStandardMaterial({ map: pitchTexture(fieldSpec.w, fieldSpec.h), roughness: 0.9 })
+    new THREE.MeshStandardMaterial({ map: textureFn(fieldSpec.w, fieldSpec.h), roughness: theme === "pitch" ? 0.9 : 0.6 })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(fieldSpec.w / 2, 0, fieldSpec.h / 2);
   ground.receiveShadow = true;
   group.add(ground);
-  scene.add(group);
-  field = group;
 
   const cx = fieldSpec.w / 2;
   const cz = fieldSpec.h / 2;
-  const radius = Math.max(fieldSpec.w, fieldSpec.h) * 0.85;
 
+  if (theme === "room") {
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x2a3038, roughness: 0.95 });
+    const wallHeight = 4;
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(fieldSpec.w, wallHeight), wallMat);
+    back.position.set(cx, wallHeight / 2, 0);
+    group.add(back);
+    const left = new THREE.Mesh(new THREE.PlaneGeometry(fieldSpec.h, wallHeight), wallMat);
+    left.rotation.y = Math.PI / 2;
+    left.position.set(0, wallHeight / 2, cz);
+    group.add(left);
+  }
+
+  scene.add(group);
+  field = group;
+
+  if (theme === "pitch") {
+    stadium = buildStadium(cx, cz, fieldSpec);
+    scene.add(stadium);
+  } else {
+    stadium = null;
+  }
+
+  // Pull back based on whichever dimension is larger, not just height, so
+  // wide-but-shallow fields (e.g. a 30x20 penalty box) still fit in frame.
+  const span = Math.max(fieldSpec.w, fieldSpec.h);
+  camera.position.set(cx, span * 0.95, cz + span * 0.95);
+  camera.lookAt(cx, 0, cz);
+}
+
+function buildStadium(cx, cz, fieldSpec) {
+  const radius = Math.max(fieldSpec.w, fieldSpec.h) * 0.85;
   const standsGroup = new THREE.Group();
   const stand = new THREE.Mesh(
     new THREE.TorusGeometry(radius, 1.4, 8, 32),
@@ -171,14 +258,7 @@ function buildField(fieldSpec) {
     spot.position.set(x, poleHeight, z);
     standsGroup.add(spot);
   }
-  scene.add(standsGroup);
-  stadium = standsGroup;
-
-  // Pull back based on whichever dimension is larger, not just height, so
-  // wide-but-shallow fields (e.g. a 30x20 penalty box) still fit in frame.
-  const span = Math.max(fieldSpec.w, fieldSpec.h);
-  camera.position.set(cx, span * 0.95, cz + span * 0.95);
-  camera.lookAt(cx, 0, cz);
+  return standsGroup;
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +388,37 @@ function goalFacingRotationY(entity, fieldSpec) {
   return rotY;
 }
 
+function buildMarker(entity) {
+  const [sx, sy] = entity.size ?? [entity.radius ? entity.radius * 2 : 1, entity.radius ? entity.radius * 2 : 1];
+  const radius = Math.max(sx, sy) / 2 || entity.radius || 0.6;
+
+  const group = new THREE.Group();
+  const disc = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, 0.03, 24),
+    new THREE.MeshStandardMaterial({
+      color: entity.color ?? "#ffd166",
+      emissive: entity.color ?? "#ffd166",
+      emissiveIntensity: 0.6,
+      transparent: true,
+      opacity: 0.55,
+    })
+  );
+  disc.position.y = 0.02;
+  group.add(disc);
+
+  const ringGeom = new THREE.RingGeometry(radius * 0.92, radius, 32);
+  const ring = new THREE.Mesh(
+    ringGeom,
+    new THREE.MeshBasicMaterial({ color: entity.color ?? "#ffd166", side: THREE.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.04;
+  group.add(ring);
+
+  group.userData.halfHeight = 0;
+  return group;
+}
+
 function buildPlain(entity) {
   let geometry;
   let halfHeight = entity.radius ?? 0.5;
@@ -334,6 +445,7 @@ function buildEntity(entity) {
   if (visual === "humanoid") return buildHumanoid(entity.color ?? "#4f8cff");
   if (visual === "ball") return buildBall(entity.radius ?? 0.35);
   if (visual === "goal") return buildGoal(entity.size ?? [4, 2]);
+  if (visual === "marker") return buildMarker(entity);
   return buildPlain(entity);
 }
 

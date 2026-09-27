@@ -140,6 +140,21 @@ def _validate_control_spec(spec: dict) -> None:
         kept_entities.append(ent)
     spec["entities"] = kept_entities
 
+    # Defense in depth against out-of-range positions: the model sometimes
+    # assumes a center-origin coordinate system and emits negative or
+    # out-of-bounds coordinates, which places the entity outside the field
+    # and outside the camera's framing - it looks like the entity vanished.
+    margin = 0.5
+    for ent in spec["entities"]:
+        pos = ent.get("initial_position")
+        if isinstance(pos, (list, tuple)) and len(pos) == 2:
+            x, y = float(pos[0]), float(pos[1])
+            if not (0 <= x <= field_w and 0 <= y <= field_h):
+                ent["initial_position"] = [
+                    min(max(x, margin), field_w - margin),
+                    min(max(y, margin), field_h - margin),
+                ]
+
     entity_ids = {e["id"] for e in spec["entities"]}
     if not entity_ids:
         raise TaskGenerationError("La tarea generada no tiene entidades utilizables.")

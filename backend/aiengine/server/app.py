@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.types import Scope
 
 from aiengine.envs.registry import create_env, get_classifier, get_spec, list_tasks, register_task
 from aiengine.generation.task_generator import TaskGenerationError, generate_task_spec
@@ -205,4 +206,19 @@ async def ws_endpoint(websocket: WebSocket):
         session.clients.discard(websocket)
 
 
-app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+class NoCacheStaticFiles(StaticFiles):
+    """Disables browser caching for the frontend's JS/CSS/HTML.
+
+    This is a local dev tool people will keep editing (their own tasks,
+    their own visuals) - a stale cached module silently shadowing a real
+    code change is a worse experience than the tiny cost of re-fetching
+    a few small files on every load.
+    """
+
+    async def get_response(self, path: str, scope: Scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+
+app.mount("/", NoCacheStaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

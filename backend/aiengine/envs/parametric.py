@@ -173,9 +173,11 @@ class ParametricEnv(Environment):
                 {
                     "id": ent["id"],
                     "kind": ent.get("kind", "circle"),
+                    "visual": ent.get("visual", "plain"),
                     "radius": ent.get("radius", 0.5),
                     "size": ent.get("size", [1.0, 1.0]),
                     "position": [body.position.x, 0, body.position.y],
+                    "velocity": [body.velocity.x, 0, body.velocity.y],
                     "color": ent.get("color", "#4f8cff"),
                 }
             )

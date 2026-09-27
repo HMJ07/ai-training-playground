@@ -46,7 +46,29 @@ CONTROL_TASK_TOOL = {
                     "required": ["id", "kind", "color"],
                     "properties": {
                         "id": {"type": "string", "description": "Unique snake_case id, e.g. 'player', 'ball', 'goal'."},
-                        "kind": {"type": "string", "enum": ["circle", "box"]},
+                        "kind": {
+                            "type": "string",
+                            "enum": ["circle", "box"],
+                            "description": (
+                                "PHYSICS shape only (a circle or a box collider) - does not affect how "
+                                "it looks. Use `visual` for appearance."
+                            ),
+                        },
+                        "visual": {
+                            "type": "string",
+                            "enum": ["humanoid", "ball", "goal", "plain"],
+                            "description": (
+                                "How this entity is DRAWN, independent of its physics `kind`. "
+                                "'humanoid': a person/character/animal-like actor (a player, a robot with "
+                                "a body, anything that acts) - rendered as a simple articulated figure "
+                                "with a walk/kick animation; always use `kind: circle` with it. "
+                                "'ball': a ball or projectile - rendered as a textured sphere; use with "
+                                "`kind: circle`. 'goal': a goal, net, hoop or target structure - rendered "
+                                "as a real goal frame with posts and a net; use with `kind: box` sized "
+                                "[width, height] of the opening. 'plain': anything else (a wall, a zone "
+                                "marker, an obstacle, a generic object) - a plain circle or box."
+                            ),
+                        },
                         "radius": {"type": "number", "description": "For kind=circle."},
                         "size": {
                             "type": "array",
@@ -62,7 +84,12 @@ CONTROL_TASK_TOOL = {
                             "description": "True for immovable markers/obstacles/goals.",
                         },
                         "initial_position": {
-                            "description": "[x, y] within the field, or the string 'random'.",
+                            "description": (
+                                "[x, y], or the string 'random'. The origin (0, 0) is the BOTTOM-LEFT "
+                                "corner of the field, NOT the center - valid values are 0 <= x <= "
+                                "field.width and 0 <= y <= field.height. Never use negative numbers or "
+                                "numbers beyond field.width/field.height."
+                            ),
                         },
                     },
                 },
@@ -215,6 +242,11 @@ Rules for `define_control_task`:
 - Always include a small `time_penalty` so the agent is encouraged to act quickly.
 - Pick sensible field size, forces and reward weights so the task is learnable \
   in a few hundred thousand steps of PPO.
+- Set `visual` on every entity for realistic rendering: any person/character/ \
+  animal/robot-with-a-body actor gets `visual: "humanoid"`; a ball or \
+  projectile gets `visual: "ball"`; a goal/net/hoop/target structure gets \
+  `visual: "goal"`; anything else (walls, zone markers, generic obstacles) \
+  gets `visual: "plain"`.
 
 Rules for `define_classification_task`:
 - Generate at least 20 seed examples, balanced across labels as evenly as \

@@ -196,8 +196,21 @@ Rules for `define_control_task`:
 - The agent always controls exactly ONE entity by pushing it with a 2D force \
   (fx, fy). Everything else in the scene is either physics-driven (a ball that \
   gets bumped) or static (a goal marker, an obstacle).
-- Represent goals, targets, and zones as entities too (usually `static: true`), \
-  and reward reaching them with `reach_bonus` and/or shape the approach with \
+- If the description names a distinct actor that acts on an object (a player \
+  kicking a ball, a robot pushing a box, someone catching something), create \
+  TWO entities - the actor (which the agent controls) and the object - so the \
+  actor physically has to reach and push the object, instead of the agent \
+  teleporting/controlling the object directly. Only control the object \
+  directly when the description has no separate actor (e.g. "a ball that \
+  learns to reach a target").
+- NEVER create an entity to represent the field's outer walls or boundary \
+  (e.g. no "field_boundary", "wall", "border" entity covering the whole \
+  field) - the sandbox already renders and physically simulates solid walls \
+  around the whole field automatically. Adding one yourself creates a \
+  duplicate solid block the size of the field that traps everything inside it.
+- Represent goals, targets, zones and obstacles as entities (usually \
+  `static: true`), each noticeably smaller than the field itself, and reward \
+  reaching them with `reach_bonus` and/or shape the approach with \
   `distance_delta`.
 - Always include a small `time_penalty` so the agent is encouraged to act quickly.
 - Pick sensible field size, forces and reward weights so the task is learnable \

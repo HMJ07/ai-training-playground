@@ -124,9 +124,25 @@ def _generate_with_groq(description: str, api_key: str) -> tuple[str, dict]:
 
 
 def _validate_control_spec(spec: dict) -> None:
-    entity_ids = {e["id"] for e in spec.get("entities", [])}
+    field = spec.get("field", {})
+    field_w, field_h = float(field.get("width", 20)), float(field.get("height", 20))
+
+    # Defense in depth against the model ignoring the "no boundary entity"
+    # rule in the prompt: drop any static box whose footprint covers most of
+    # the field - it would otherwise render/physically act as a solid block
+    # filling the whole sandbox (the walls are already built in automatically).
+    kept_entities = []
+    for ent in spec.get("entities", []):
+        if ent.get("kind") == "box" and ent.get("static"):
+            sw, sh = ent.get("size", [1, 1])
+            if sw >= field_w * 0.6 and sh >= field_h * 0.6:
+                continue
+        kept_entities.append(ent)
+    spec["entities"] = kept_entities
+
+    entity_ids = {e["id"] for e in spec["entities"]}
     if not entity_ids:
-        raise TaskGenerationError("La tarea generada no tiene entidades.")
+        raise TaskGenerationError("La tarea generada no tiene entidades utilizables.")
 
     controlled = spec.get("action", {}).get("controlled_entity")
     if controlled not in entity_ids:

@@ -75,7 +75,14 @@ CONTROL_TASK_TOOL = {
                             "items": {"type": "number"},
                             "minItems": 2,
                             "maxItems": 2,
-                            "description": "[width, height] for kind=box.",
+                            "description": (
+                                "For kind=box: [x_extent, y_extent], the box's footprint on the ground "
+                                "in the SAME 2D plane as everything else (not a width+vertical-height "
+                                "pair - there is no vertical axis in this physics model). For a goal, "
+                                "make one extent small (e.g. 0.5, the goal line's thinness) and the "
+                                "other the actual mouth width (e.g. 5-8) - the renderer figures out "
+                                "which side the mouth faces from this shape and the entity's position."
+                            ),
                         },
                         "color": {"type": "string", "description": "CSS hex color, e.g. '#4f8cff'."},
                         "mass": {"type": "number", "minimum": 0.1, "maximum": 200},

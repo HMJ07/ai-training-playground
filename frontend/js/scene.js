@@ -30,6 +30,7 @@ scene.add(sun);
 let field = null;
 let fieldKey = null;
 let stadium = null;
+let currentFieldSpec = null;
 const entityMeshes = new Map();
 const entityKinds = new Map(); // id -> "humanoid" | "ball" | "goal" | "plain"
 const clock = new THREE.Clock();
@@ -116,6 +117,7 @@ function soccerBallTexture() {
 // ---------------------------------------------------------------------------
 
 function buildField(fieldSpec) {
+  currentFieldSpec = fieldSpec;
   const key = `${fieldSpec.w}x${fieldSpec.h}`;
   if (key === fieldKey) return;
   fieldKey = key;
@@ -172,7 +174,10 @@ function buildField(fieldSpec) {
   scene.add(standsGroup);
   stadium = standsGroup;
 
-  camera.position.set(cx, Math.max(fieldSpec.w, fieldSpec.h) * 0.75, fieldSpec.h * 1.25);
+  // Pull back based on whichever dimension is larger, not just height, so
+  // wide-but-shallow fields (e.g. a 30x20 penalty box) still fit in frame.
+  const span = Math.max(fieldSpec.w, fieldSpec.h);
+  camera.position.set(cx, span * 0.95, cz + span * 0.95);
   camera.lookAt(cx, 0, cz);
 }
 
@@ -227,11 +232,17 @@ function buildBall(radius) {
   return mesh;
 }
 
+// `size` is the entity's 2D ground footprint [x-extent, y-extent] - the same
+// numbers the physics engine uses (pymunk has no concept of "3D height").
+// A goal is thin along one axis (the goal line) and long along the other
+// (the mouth) - so the opening width is whichever number is bigger, and we
+// orient + face the goal from that, rather than assuming a fixed layout.
 function buildGoal(size) {
-  const [w, h] = size;
+  const w = Math.max(size[0], size[1], 1);
+  const h = 2.2; // real-world-ish goal height; footprint carries no vertical info
   const group = new THREE.Group();
   const postMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.4 });
-  const postRadius = Math.max(0.05, Math.min(w, h) * 0.04);
+  const postRadius = Math.max(0.05, w * 0.02);
 
   const postL = new THREE.Mesh(new THREE.CylinderGeometry(postRadius, postRadius, h, 10), postMat);
   postL.position.set(-w / 2, h / 2, 0);
@@ -248,7 +259,7 @@ function buildGoal(size) {
   bar.castShadow = true;
   group.add(bar);
 
-  const netDepth = Math.min(w, h) * 0.35;
+  const netDepth = Math.max(0.6, Math.min(w * 0.3, h * 0.8));
   const netMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 });
   const netPoints = [];
   const divisions = 8;
@@ -275,13 +286,39 @@ function buildGoal(size) {
   return group;
 }
 
+// The goal above is built "facing +Z" by default (mouth open toward +Z,
+// net receding toward -Z), with posts spread along local X using the
+// footprint's longer side. This works out which way to actually turn it so
+// the mouth faces the middle of the field, from nothing but its own
+// footprint shape and where it sits relative to the field center.
+function goalFacingRotationY(entity, fieldSpec) {
+  const [sx, sy] = entity.size ?? [4, 1];
+  let rotY = sy > sx ? Math.PI / 2 : 0;
+
+  if (!fieldSpec) return rotY;
+  const [ex, , ez] = entity.position;
+  const outwardX = ex - fieldSpec.w / 2;
+  const outwardZ = ez - fieldSpec.h / 2;
+
+  // Local -Z (the net's side) expressed in world space after rotating by rotY.
+  const netFacingX = -Math.sin(rotY);
+  const netFacingZ = -Math.cos(rotY);
+  const netPointsOutward = netFacingX * outwardX + netFacingZ * outwardZ > 0;
+  if (!netPointsOutward) rotY += Math.PI;
+  return rotY;
+}
+
 function buildPlain(entity) {
   let geometry;
   let halfHeight = entity.radius ?? 0.5;
   if (entity.kind === "box") {
-    const [sw, sh] = entity.size ?? [1, 1];
-    geometry = new THREE.BoxGeometry(sw, sh, sw);
-    halfHeight = sh / 2;
+    // `size` is the 2D ground footprint [x-extent, y-extent], same as the
+    // physics box - it carries no vertical info, so we derive a sensible
+    // visual height from the footprint rather than misreading size[1] as one.
+    const [sx, sy] = entity.size ?? [1, 1];
+    const visualHeight = Math.min(3, Math.max(0.5, Math.min(sx, sy) * 1.2));
+    geometry = new THREE.BoxGeometry(sx, visualHeight, sy);
+    halfHeight = visualHeight / 2;
   } else {
     geometry = new THREE.SphereGeometry(entity.radius ?? 0.5, 24, 24);
   }
@@ -339,6 +376,7 @@ function upsertEntity(entity, dt) {
     animateHumanoid(mesh, entity.velocity, dt);
   } else if (visual === "goal") {
     mesh.position.set(x, y, z);
+    mesh.rotation.y = goalFacingRotationY(entity, currentFieldSpec);
   } else {
     const halfHeight = mesh.userData.halfHeight ?? entity.radius ?? 0.5;
     mesh.position.set(x, halfHeight + y, z);
